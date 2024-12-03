@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>大文件分片上传</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .progress-container {
+            width: 100%;
+            background-color: #f0f0f0;
+            padding: 3px;
+            border-radius: 3px;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, .2);
+        }
+        .progress-bar {
+            display: block;
+            height: 22px;
+            background-color: #659cef;
+            border-radius: 3px;
+            transition: width 500ms ease-in-out;
+            width: 0%;
+        }
+        .progress-text {
+            color: white;
+            text-align: center;
+            line-height: 22px;
+        }
+    </style>
+</head>
+<body>
+    <h2>大文件分片上传</h2>
+    <input type="file" id="fileInput">
+    <button onclick="startUpload()">开始上传</button>
+    <div class="progress-container">
+        <div class="progress-bar">
+            <div class="progress-text">0%</div>
+        </div>
+    </div>
+    <div id="status"></div>
+
+    <script>
+        const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB per chunk
+
+        async function startUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('请选择文件');
+                return;
+            }
+
+            const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+            let uploadedChunks = 0;
+            const progressBar = document.querySelector('.progress-bar');
+            const progressText = document.querySelector('.progress-text');
+            const statusDiv = document.getElementById('status');
+
+            for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                const start = chunkIndex * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, file.size);
+                const chunk = file.slice(start, end);
+
+                const formData = new FormData();
+                formData.append('file', chunk);
+                formData.append('fileName', file.name);
+                formData.append('chunkIndex', chunkIndex);
+                formData.append('totalChunks', totalChunks);
+
+                try {
+                    const response = await fetch('chunk-upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+                    uploadedChunks++;
+
+                    // 更新进度条
+                    const progress = (uploadedChunks / totalChunks) * 100;
+                    progressBar.style.width = progress + '%';
+                    progressText.textContent = Math.round(progress) + '%';
+
+                    statusDiv.innerHTML = `正在上传分片 ${uploadedChunks}/${totalChunks}`;
+
+                    if (result.status === 'success' && result.message === 'File upload completed') {
+                        statusDiv.innerHTML = '文件上传完成！';
+                    }
+                } catch (error) {
+                    console.error('Error uploading chunk:', error);
+                    statusDiv.innerHTML = `上传出错: ${error.message}`;
+                    return;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
